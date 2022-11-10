@@ -11,8 +11,50 @@ import mysql.connector
 
 fake = Faker()  # To put a name to the police.
 
-
 # __ SQL __
+def create_new_tables():
+    if str(input("Are you the code developer? ")).lower() == "no":
+        input1 = str(input("What is your password for SQL? "))
+        print(f"{Fore.RED}NOTE: THIS CAN ONLY BE DONE ONCE. IF ERROR RERUN AND CHECK DATABASE:{Style.RESET_ALL} Boat_Simulation")
+        question1 = str(input("Do you want to create a database? "))
+        if question1 == "yes":
+            database = mysql.connector.connect(user="root",
+                                               password=input1,
+                                               host="127.0.0.1")
+            cursor = database.cursor()
+            query = "CREATE database Boat_Simulation"
+            cursor.execute(query)
+            input2 = "Boat_Simulation"
+            print("Database Name: Boat_Simulation")
+        else:
+            input2 = str(input("What is the name of you database? "))
+
+        database, cursor = create_tables(input1, input2)
+        add_all_columns(Boats(1, 0), cursor)
+
+    else:
+        password = str(input("Password: "))
+        while password != "123456":
+            print("That was incorrect")
+            password = str(input("Password: "))
+
+        input1 = "7deJuniode2002"
+        input2 = "project"
+
+        if str(input("Do you want to create the tables? ")).lower() == "yes":
+            database, cursor = create_tables(input1, input2)
+            add_all_columns(Boats(1, 0), cursor)
+        else:
+            database = mysql.connector.connect(user="root",
+                                          password=input1,
+                                          host="127.0.0.1",
+                                          database=input2)
+
+            cursor = database.cursor()
+
+    return database, cursor
+
+
 def create_tables(input1, input2):
     cnx = mysql.connector.connect(user="root",
                                   password=input1,
@@ -54,6 +96,11 @@ def add_all_columns(boat, cursor):
             query = "ALTER TABLE Boats ADD {} INT ".format(keys.capitalize())
         cursor.execute(query)
 
+    column_list = ["time_waited_entrance_area", "time_loading_off_area"]
+    for i in column_list:
+        query = "ALTER TABLE Boats_arrivals ADD {} INT".format(i.capitalize())
+        cursor.execute(query)
+
 
 def insert_boats_arrivals(start, boat, cnx, cursor):
     try:
@@ -67,8 +114,17 @@ def insert_boats_arrivals(start, boat, cnx, cursor):
 
 def insert_boats_departures(start, boat, cnx, cursor):
     try:
-        query = f"INSERT INTO Boats_arrivals (Boat, Departure_time) VALUES ('{boat.name}',{time.time()-start});"
+        query = f"UPDATE Boats_arrivals SET Departure_time= ({time.time()-start}) WHERE Boat=('{boat.name}');"
         cursor.execute(query)
+        cnx.commit()
+
+    except Exception:
+        traceback.print_exc()
+
+
+def insert_boats_time(column_name, first_time,  boat, cnx, cursor):
+    try:
+        cursor.execute(f"UPDATE Boats_arrivals SET {column_name}=({time.time() - first_time}) WHERE Boat=('{boat.name}');")
         cnx.commit()
 
     except Exception:
@@ -82,7 +138,7 @@ def insert_values_initial(boat, cnx, cursor):
         attributes.pop("active")
         attributes.pop("priority")
 
-        query = "INSERT INTO Boats VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"  #You need to put %s as much as variables to input in to the dataset.
+        query = "INSERT INTO Boats VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"  #You need to put %s as much as variables to input in to the dataset.
         values = tuple(attributes.values())
         cursor.execute(query, values)
 
@@ -90,6 +146,23 @@ def insert_values_initial(boat, cnx, cursor):
 
     except Exception:
         traceback.print_exc()
+
+
+def get_starting_number(cursor):
+    cursor.execute("SELECT Boat FROM Boats_arrivals")
+    result = cursor.fetchall()
+    result_list = []
+    for x in result:
+        x = x[0]
+        x = x.split(" ")
+        x = x[1]
+        result_list.append(int(x))
+    if len(result_list) == 0:
+        maximum = 0
+    else:
+        maximum = max(result_list) + 1
+
+    return maximum
 
 
 # __ SIMULATION __
@@ -110,8 +183,9 @@ class Boats:  # Initialize the boats class.
         # To know what cargo it wants depending on the model (This can be changed).
         self.merchandise = "Item1"
         self.containers = 0
+        self.checked_by_police = "No"
         self.economic_value = 0
-        #self.tax = 0  # Put a 21% of tax in one thing, 10% in another and 5% in another.
+        self.tax = 0  # Put a 21% of tax in one thing, 10% in another and 5% in another.
         self.initialise_attributes()
 
     def initialise_attributes(self):
@@ -127,9 +201,11 @@ class Boats:  # Initialize the boats class.
         key_value_of_items = dict(zip(item_list, price_list))
         self.merchandise = random.choice(item_list)
         self.economic_value = self.containers * key_value_of_items[self.merchandise]
-        if random.randint(1, 20) == 10:
+        if random.randint(1, 50) == 10:
             self.merchandise = "Cocaine"
             self.economic_value = self.containers * 200
+
+        self.tax = self.economic_value * 0.15
 
     def delay_in_arriving(self):
         while not self.active:
@@ -147,6 +223,13 @@ class Boats:  # Initialize the boats class.
         while self.priority != 0:
             time.sleep(3)
             self.priority = self.port.entrance_queue.index(self.name)
+
+    def refuel(self):
+        if self.gasoline == "Yes":
+            print(f"{self.name} needs gasoline.")
+            time.sleep(random.randint(5, 10))
+            self.out_entrance_queue()
+            self.into_entrance_queue()
 
     def check_if_enter(self):
         while len(self.port.in_port) > (self.port.cargos_each * 3) + 3:
@@ -234,7 +317,7 @@ class Ports:
 class Police:
     def __init__(self):
         # Put a name to the police and an active attribute to know when the police is occupied.
-        self.name = fake.name()
+        self.name = "Detective " + fake.name()
         self.active = True
 
     def search_boats(self, boat):
@@ -242,13 +325,17 @@ class Police:
             time.sleep(3)
 
         self.active = False
-        print(f"Police Detective {self.name} is going to search a boat.")
+        print(f"{self.name} is going to search a boat.")
+        boat.checked_by_police = "Yes"
 
         time.sleep(2)  # Register the boat
-        if boat.merchandise == "Item4":  # Condition if boat is carrying something illegal.
-            print(f"Police Detective {self.name} found something illegal.")
+        if boat.merchandise == "Cocaine":  # Condition if boat is carrying something illegal.
+            print(f"{self.name} found something illegal.")
             self.active = True
             boat.out_load_off(3)
+            locker_database.acquire()
+            insert_values_initial(boat=boat, cnx=database, cursor=cursor)
+            locker_database.release()
             exit()  # Break to finalize the boat from the simulation
 
         else:
@@ -271,25 +358,33 @@ def main(name):  # This is the beginning of the simulation
         boat = Boats(name=name, port=port)
         # Calls the delay to make it random when the boats are arriving.
         boat.delay_in_arriving()
+        # Into the big queue
+        first_time = time.time()
         locker_database.acquire()
         insert_boats_arrivals(start=start, boat=boat, cnx=database, cursor=cursor)
         locker_database.release()
-        # Into the big queue
         boat.into_entrance_queue()
         print(f"{boat.name} entered the port queue.")
         # Check the priority of the boat (if it is in front or not).
         boat.priority_check()
+        # Check if the boat needs gasoline
+        boat.refuel()
         # Check if they can enter the port
         boat.check_if_enter()
         # Out of the big queue
         boat.out_entrance_queue()
+        locker_database.acquire()
+        insert_boats_time(column_name="Time_waited_entrance_area", first_time=first_time, boat=boat, cnx=database,
+                          cursor=cursor)
+        locker_database.release()
         # Goes to the load_off area
+        first_time = time.time()
         boat.into_load_off(port.cargos_each)
         # Time to get to the loading area
         time.sleep(random.randint(1, 5))
         print(f"{boat.name} entered the loading area.")
         # If police is suspicious, stop the main function and search the boat
-        if random.randint(1, 15) == 1:
+        if random.randint(1, 10) == 1:
             police.search_boats(boat=boat)
         # Loads_off
         print(f"{boat.name} is loading off.")
@@ -299,8 +394,10 @@ def main(name):  # This is the beginning of the simulation
         boat.out_load_off(port.cargos_each)
         # Bye.
         locker_database.acquire()
+        insert_boats_time(column_name="Time_loading_off_area", first_time=first_time, boat=boat, cnx=database,
+                          cursor=cursor)
         insert_boats_departures(start=start, boat=boat, cnx=database, cursor=cursor)
-        insert_values_initial(boat=boat, cnx=database, cursor=cursor)  # This database is for the boats that are legal and finished the process.
+        insert_values_initial(boat=boat, cnx=database, cursor=cursor)
         locker_database.release()
 
     except Exception:
@@ -308,66 +405,19 @@ def main(name):  # This is the beginning of the simulation
 
 
 # ___ THIS PART IS WHERE THE CODE RUNS ___
-
-number_of_boats = 10
+number_of_boats = 30
 
 print(f"{Fore.CYAN}WELCOME TO THE PROGRAM SIMULATION!{Style.RESET_ALL}\n"
       f"Here you will create a database of boat arrivals to an specific port. Let's start!")
 print("----------------------------------------------------------------------")
 print(f"{Fore.LIGHTWHITE_EX}First, we need to ask a couple of questions ... {Style.RESET_ALL}")
-
-
-def create_new_tables():
-    if str(input("Are you the code developer? ")).lower() == "no":
-        input1 = str(input("What is your password for SQL? "))
-        print(f"{Fore.RED}NOTE: THIS CAN ONLY BE DONE ONCE. IF ERROR RERUN AND CHECK DATABASE:{Style.RESET_ALL} Boat_Simulation")
-        question1 = str(input("Do you want to create a database? "))
-        if question1 == "yes":
-            database = mysql.connector.connect(user="root",
-                                               password=input1,
-                                               host="127.0.0.1")
-            cursor = database.cursor()
-            query = "CREATE database Boat_Simulation"
-            cursor.execute(query)
-            input2 = "Boat_Simulation"
-            print("Database Name: Boat_Simulation")
-        else:
-            input2 = str(input("What is the name of you database? "))
-
-        database, cursor = create_tables(input1, input2)
-        add_all_columns(Boats(1, 0), cursor)
-
-    else:
-        password = str(input("Password: "))
-        while password != "123456":
-            print("That was incorrect")
-            password = str(input("Password: "))
-
-        input1 = "7deJuniode2002"
-        input2 = "project"
-
-        if str(input("Do you want to create the tables? ")).lower() == "yes":
-            database, cursor = create_tables(input1, input2)
-            add_all_columns(Boats(1, 0), cursor)
-        else:
-            database = mysql.connector.connect(user="root",
-                                          password=input1,
-                                          host="127.0.0.1",
-                                          database=input2)
-
-            cursor = database.cursor()
-
-    return database, cursor
-
 database, cursor = create_new_tables()
-
+starting_number = get_starting_number(cursor=cursor)
 print("----------------------------------------------------------------------")
 print(f"{Fore.LIGHTYELLOW_EX} __WELCOME TO THE SIMULATION__ {Style.RESET_ALL}")
 start = time.time()
-
 with concurrent.futures.ThreadPoolExecutor(max_workers=number_of_boats) as executor:
-    executor.map(main, range(number_of_boats))
-
+    executor.map(main, range(starting_number, starting_number + number_of_boats))
 finish = time.time()
 print("----------------------------------------------------------------------")
 print(f"The simulation time was {int(finish - start)} seconds.")
