@@ -327,7 +327,7 @@ def create_new_tables():
                                                password=input1,
                                                host="127.0.0.1")
             cursor = database.cursor()
-            query = "CREATE database Boat_simulation"
+            query = "CREATE database Boat_Simulation"
             cursor.execute(query)
             input2 = "Boat_Simulation"
             print("Database Name: Boat_Simulation")
