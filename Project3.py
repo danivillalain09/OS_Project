@@ -14,185 +14,184 @@ from PIL import ImageTk, Image
 fake = Faker()  # To put a name to the police.
 
 # __ SQL __
-class Databases:
-    def __init__(self):
-        pass
-
-    def create_new_database(self):
-        #x = str(input("Are you the code developer? ")).lower()
-        x = "yes"
-        if x == "no":
-            input1 = str(input("What is your password for SQL? "))
-            print(f"{Fore.RED}NOTE: THIS CAN ONLY BE DONE ONCE. IF ERROR RERUN AND CHECK DATABASE:{Style.RESET_ALL} Boat_Simulation")
-            question1 = str(input("Do you want to create a database? "))
-            if question1 == "yes":
-                database = mysql.connector.connect(user="root",
-                                                   password=input1,
-                                                   host="127.0.0.1")
-                cursor = database.cursor()
-                query = "CREATE database Boat_Simulation"
-                cursor.execute(query)
-                input2 = "Boat_Simulation"
-                print("Database Name: Boat_Simulation")
-            else:
-                input2 = str(input("What is the name of you database? "))
-
-            database, cursor = self.create_tables(input1, input2)
-            self.add_all_columns(BoatSQL(), cursor)
-
+def create_new_database():
+    #x = str(input("Are you the code developer? ")).lower()
+    x = "yes"
+    if x == "no":
+        input1 = str(input("What is your password for SQL? "))
+        print(f"{Fore.RED}NOTE: THIS CAN ONLY BE DONE ONCE. IF ERROR RERUN AND CHECK DATABASE:{Style.RESET_ALL} Boat_Simulation")
+        question1 = str(input("Do you want to create a database? "))
+        if question1 == "yes":
+            database = mysql.connector.connect(user="root",
+                                               password=input1,
+                                               host="127.0.0.1")
+            cursor = database.cursor()
+            query = "CREATE database Boat_Simulation"
+            cursor.execute(query)
+            input2 = "Boat_Simulation"
+            print("Database Name: Boat_Simulation")
         else:
-            #password = str(input("Password: "))
-            password = "123456"
-            while password != "123456":
-                print("That was incorrect")
-                password = str(input("Password: "))
+            input2 = str(input("What is the name of you database? "))
 
-            input1 = "7deJuniode2002"
-            input2 = "project"
-            #y = str(input("Do you want to create the tables? ")).lower()
-            y = "yes"
-            if y == "yes":
-                database, cursor = self.create_tables(input1, input2)
-                self.add_all_columns(Boats(1, 0), cursor)
-            else:
-                database = mysql.connector.connect(user="root",
-                                              password=input1,
-                                              host="127.0.0.1",
-                                              database=input2)
+        database, cursor = create_tables(input1, input2)
+        add_all_columns(BoatSQL(), cursor)
 
-                cursor = database.cursor()
+    else:
+        #password = str(input("Password: "))
+        password = "123456"
+        while password != "123456":
+            print("That was incorrect")
+            password = str(input("Password: "))
 
-        return database, cursor
+        input1 = "7deJuniode2002"
+        input2 = "project"
+        #y = str(input("Do you want to create the tables? ")).lower()
+        y = "yes"
+        if y == "yes":
+            database, cursor = create_tables(input1, input2)
+            add_all_columns(Boats(1, 0), cursor)
+        else:
+            database = mysql.connector.connect(user="root",
+                                          password=input1,
+                                          host="127.0.0.1",
+                                          database=input2)
 
+            cursor = database.cursor()
 
-    def create_tables(self, input1, input2):
-        cnx = mysql.connector.connect(user="root",
-                                      password=input1,
-                                      host="127.0.0.1",
-                                      database=input2)
-
-        cursor = cnx.cursor()
-
-        try:
-            cursor.execute("CREATE TABLE Boats (Boat VARCHAR(255))")
-            cursor.execute("CREATE TABLE Boats_Arrivals (Boat VARCHAR(255), Arrival_time INT, Departure_time INT)")
-            cursor.execute("CREATE TABLE Boats_Guilty (Boat VARCHAR(255))")
-
-        except mysql.connector.errors.ProgrammingError:
-            print("Creating the table...")
-            time.sleep(2)
-            print("Creating the table...")
-            cursor.execute("DROP TABLE Boats")
-            cursor.execute("DROP TABLE Boats_Arrivals")
-            cursor.execute("DROP TABLE Boats_Guilty")
-            cursor.execute("CREATE TABLE Boats (Boat VARCHAR(255))")
-            cursor.execute("CREATE TABLE Boats_Arrivals (Boat VARCHAR(255), Arrival_time INT, Departure_time INT)")
-            cursor.execute("CREATE TABLE Boats_Guilty (Boat VARCHAR(255))")
-            time.sleep(2)
-            print("Table created successfully!")
-
-        return cnx, cursor
+    return database, cursor
 
 
-    def add_all_columns(self, boat, cursor):
+def create_tables(input1, input2):
+    cnx = mysql.connector.connect(user="root",
+                                  password=input1,
+                                  host="127.0.0.1",
+                                  database=input2)
+
+    cursor = cnx.cursor()
+
+    try:
+        cursor.execute("CREATE TABLE Boats (Boat VARCHAR(255))")
+        cursor.execute("CREATE TABLE Boats_Arrivals (Boat VARCHAR(255), Arrival_time INT, Departure_time INT)")
+        cursor.execute("CREATE TABLE Boats_Guilty (Boat VARCHAR(255))")
+
+    except mysql.connector.errors.ProgrammingError:
+        print("Creating the table...")
+        time.sleep(2)
+        print("Creating the table...")
+        cursor.execute("DROP TABLE Boats")
+        cursor.execute("DROP TABLE Boats_Arrivals")
+        cursor.execute("DROP TABLE Boats_Guilty")
+        cursor.execute("CREATE TABLE Boats (Boat VARCHAR(255))")
+        cursor.execute("CREATE TABLE Boats_Arrivals (Boat VARCHAR(255), Arrival_time INT, Departure_time INT)")
+        cursor.execute("CREATE TABLE Boats_Guilty (Boat VARCHAR(255))")
+        time.sleep(2)
+        print("Table created successfully!")
+
+    return cnx, cursor
+
+
+def add_all_columns(boat, cursor):
+    attributes = vars(boat)
+    for keys in attributes:
+        format = type(attributes[keys])
+        format = str(format)
+        if keys in ["port", "active", "priority", "name", "render", "boat", "boat_image", "position_x", "position_y", "in_cargo"]:
+            continue
+        if format == "<class 'str'>":
+            query = "ALTER TABLE Boats ADD {} VARCHAR (255)".format(keys.capitalize())
+            query2 = "ALTER TABLE Boats_Guilty ADD {} VARCHAR (255)".format(keys.capitalize())
+        elif format == "<class 'datetime.datetime'>" or format == "<class 'datetime.date'>":
+            query = "ALTER TABLE Boats ADD {} datetime".format(keys.capitalize())
+            query2 = "ALTER TABLE Boats_Guilty ADD {} datetime".format(keys.capitalize())
+        else:
+            query = "ALTER TABLE Boats ADD {} INT".format(keys.capitalize())
+            query2 = "ALTER TABLE Boats_Guilty ADD {} INT".format(keys.capitalize())
+        cursor.execute(query)
+        cursor.execute(query2)
+
+    column_list = ["time_waited_entrance_area", "time_loading_off_area"]
+    for i in column_list:
+        query = "ALTER TABLE Boats_arrivals ADD {} INT".format(i.capitalize())
+        cursor.execute(query)
+
+
+def insert_boats_arrivals(start, boat, cnx, cursor):
+    try:
+        query = f"INSERT INTO Boats_arrivals (Boat, Arrival_time) VALUES ('{boat.name}',{time.time()-start});"
+        cursor.execute(query)
+        cnx.commit()
+
+    except Exception:
+        traceback.print_exc()
+
+
+def insert_boats_departures(start, boat, cnx, cursor):
+    try:
+        query = f"UPDATE Boats_arrivals SET Departure_time= ({time.time()-start}) WHERE Boat=('{boat.name}');"
+        cursor.execute(query)
+        cnx.commit()
+
+    except Exception:
+        traceback.print_exc()
+
+
+def insert_boats_time(column_name, first_time,  boat, cnx, cursor):
+    try:
+        cursor.execute(f"UPDATE Boats_arrivals SET {column_name}=({time.time() - first_time}) WHERE Boat=('{boat.name}');")
+        cnx.commit()
+
+    except Exception:
+        traceback.print_exc()
+
+
+def insert_values_initial(boat, cnx, cursor):
+    try:
+        attributes = boat.__dict__
+        value_list = []
+
+        for i in attributes:
+            if i not in ["port", "active", "priority", "boat", "render", "boat_image", "position_x", "position_y", "in_cargo"]:
+                value_list.append(attributes[i])
+
+        query = "INSERT INTO Boats VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"  #You need to put %s as much as variables to input in to the dataset.
+        values = tuple(value_list)
+        cursor.execute(query, values)
+
+        cnx.commit()
+
+    except Exception:
+        traceback.print_exc()
+
+
+def get_starting_number(cursor):
+    cursor.execute("SELECT Boat FROM Boats_arrivals")
+    result = cursor.fetchall()
+    result_list = []
+    for x in result:
+        x = x[0]
+        x = x.split(" ")
+        x = x[1]
+        result_list.append(int(x))
+    if len(result_list) == 0:
+        maximum = 0
+    else:
+        maximum = max(result_list) + 1
+
+    return maximum
+
+
+def insert_boats_guilty(boat, cnx, cursor):
+    try:
         attributes = vars(boat)
-        for keys in attributes:
-            format = type(attributes[keys])
-            format = str(format)
-            if keys in ["port", "active", "priority", "name", "render", "boat", "boat_image", "position_x", "position_y", "in_cargo"]:
-                continue
-            if format == "<class 'str'>":
-                query = "ALTER TABLE Boats ADD {} VARCHAR (255)".format(keys.capitalize())
-                query2 = "ALTER TABLE Boats_Guilty ADD {} VARCHAR (255)".format(keys.capitalize())
-            elif format == "<class 'datetime.datetime'>" or format == "<class 'datetime.date'>":
-                query = "ALTER TABLE Boats ADD {} datetime".format(keys.capitalize())
-                query2 = "ALTER TABLE Boats_Guilty ADD {} datetime".format(keys.capitalize())
-            else:
-                query = "ALTER TABLE Boats ADD {} INT".format(keys.capitalize())
-                query2 = "ALTER TABLE Boats_Guilty ADD {} INT".format(keys.capitalize())
-            cursor.execute(query)
-            cursor.execute(query2)
 
-        column_list = ["time_waited_entrance_area", "time_loading_off_area"]
-        for i in column_list:
-            query = "ALTER TABLE Boats_arrivals ADD {} INT".format(i.capitalize())
-            cursor.execute(query)
+        query = "INSERT INTO Boats_Guilty VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"  # You need to put %s as much as variables to input in to the dataset.
+        values = tuple(attributes.values())
+        cursor.execute(query, values)
 
+        cnx.commit()
 
-    def insert_boats_arrivals(self, start, boat, cnx, cursor):
-        try:
-            query = f"INSERT INTO Boats_arrivals (Boat, Arrival_time) VALUES ('{boat.name}',{time.time()-start});"
-            cursor.execute(query)
-            cnx.commit()
-
-        except Exception:
-            traceback.print_exc()
-
-
-    def insert_boats_departures(self, start, boat, cnx, cursor):
-        try:
-            query = f"UPDATE Boats_arrivals SET Departure_time= ({time.time()-start}) WHERE Boat=('{boat.name}');"
-            cursor.execute(query)
-            cnx.commit()
-
-        except Exception:
-            traceback.print_exc()
-
-
-    def insert_boats_time(self, column_name, first_time,  boat, cnx, cursor):
-        try:
-            cursor.execute(f"UPDATE Boats_arrivals SET {column_name}=({time.time() - first_time}) WHERE Boat=('{boat.name}');")
-            cnx.commit()
-
-        except Exception:
-            traceback.print_exc()
-
-    def insert_values_initial(self, boat, cnx, cursor):
-        try:
-            attributes = boat.__dict__
-            value_list = []
-
-            for i in attributes:
-                if i not in ["port", "active", "priority", "boat", "render", "boat_image", "position_x", "position_y", "in_cargo"]:
-                    value_list.append(attributes[i])
-
-            query = "INSERT INTO Boats VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"  #You need to put %s as much as variables to input in to the dataset.
-            values = tuple(value_list)
-            cursor.execute(query, values)
-
-            cnx.commit()
-
-        except Exception:
-            traceback.print_exc()
-
-    def get_starting_number(self, cursor):
-        cursor.execute("SELECT Boat FROM Boats_arrivals")
-        result = cursor.fetchall()
-        result_list = []
-        for x in result:
-            x = x[0]
-            x = x.split(" ")
-            x = x[1]
-            result_list.append(int(x))
-        if len(result_list) == 0:
-            maximum = 0
-        else:
-            maximum = max(result_list) + 1
-
-        return maximum
-
-    def insert_boats_guilty(self, boat, cnx, cursor):
-        try:
-            attributes = vars(boat)
-
-            query = "INSERT INTO Boats_Guilty VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"  # You need to put %s as much as variables to input in to the dataset.
-            values = tuple(attributes.values())
-            cursor.execute(query, values)
-
-            cnx.commit()
-
-        except Exception:
-            traceback.print_exc()
+    except Exception:
+        traceback.print_exc()
 
 
 # __ SIMULATION __
@@ -286,7 +285,6 @@ class Boats:  # Initialize the boats class.
             time.sleep(random.randint(5, 10))
             self.out_entrance_queue()
             self.into_entrance_queue()
-            self.create_image(app=application.harbour)
 
     def check_if_enter(self):
         while len(self.port.in_port) > (self.port.cargos_each * 3):
@@ -369,6 +367,7 @@ class Boats:  # Initialize the boats class.
         self.boat_image = tk.Label(app, text=f"{self.name} moved. Position {self.in_cargo}")
         self.boat_image.pack()
         """
+
 
 class Ports:
     def __init__(self):
@@ -454,8 +453,8 @@ class Police:
             self.active = True
             boat.out_load_off(3)
             locker_database.acquire()
-            sql_class.insert_values_initial(boat=boat, cnx=database, cursor=cursor)
-            sql_class.insert_boats_guilty(boat=boat, cnx=database, cursor=cursor)
+            insert_values_initial(boat=boat, cnx=database, cursor=cursor)
+            insert_boats_guilty(boat=boat, cnx=database, cursor=cursor)
             locker_database.release()
             exit()  # Break to finalize the boat from the simulation
 
@@ -464,24 +463,54 @@ class Police:
             print("Everything okey!")
 
 
-class GUI:
-    def __init__(self, master):
+class Window(tk.Frame):
+    # Define settings upon initialization. Here you can specify
+    def __init__(self, master=None):
+        # parameters that you want to send through the Frame class.
+        tk.Frame.__init__(self, master)
+
+        # reference to the master widget, which is the tk window
         self.master = master
-        self.master.title("Simulation")
 
-        self.harbour = tk.Canvas(self.master, width=1200, height=800, bg="white")
-        self.harbour.pack(pady=20, padx=20)
+        # with that, we want to then run init_window, which doesn't yet exist
+        self.init_window()
 
-        self.background = Image.open('Background_harbour.png')
-        self.render_background = ImageTk.PhotoImage(self.background)
-        self.harbour.create_image(0, 0, anchor="nw", image=self.render_background)
+    # Creation of init_window
+    def init_window(self):
+        # changing the title of our master widget
+        self.master.title("GUI")
+        # allowing the widget to take the full space of the root window
+        self.pack(fill="both", expand=1)
+
+    def first_create_boats(self, boat):
+        load = Image.open("boat.png")
+        render = ImageTk.PhotoImage(load)
+
+        # labels can be text or images
+        boat.boat_image = tk.Label(self, image=render, text=boat.name, compound="top")
+        boat.boat_image.image = render
+        boat.boat_image.place(x=900, y=200 + (boat.priority*80))
+
+    def show_boat(self, boat):
+        load = Image.open("boat.png")
+        render = ImageTk.PhotoImage(load)
+
+        # labels can be text or images
+        boat.boat_image = tk.Label(self, image=render, text=boat.name, compound="top")
+        boat.boat_image.image = render
+        boat.boat_image.place(x=random.randint(200, 900), y=random.randint(200, 900))
+
+    def boat_destroy(self, boat):
+        boat.boat_image.destroy()
 
 
 port = Ports()  # We create a general instance of the port as we want only 1 port.
 police = Police()  # Same happens with the police.
-window = tk.Tk()
-application = GUI(window)
-sql_class = Databases()
+root = tk.Tk()
+root.geometry("1200x1200")
+
+# creation of an instance
+application = Window(root)
 
 finished_boats = 0
 locker_database = threading.Lock()
@@ -500,19 +529,15 @@ def main(name):  # This is the beginning of the simulation
         # Into the big queue
         first_time = time.time()
         locker_database.acquire()
-        sql_class.insert_boats_arrivals(start=start, boat=boat, cnx=database, cursor=cursor)
+        insert_boats_arrivals(start=start, boat=boat, cnx=database, cursor=cursor)
         locker_database.release()
         print(f"{boat.name} entered the port.")
         boat.into_entrance_queue()
-        while movement_lock.locked() and boat.priority != 0:
-            continue
-        movement_lock.acquire()
         time.sleep(2)
-        boat.create_image(application.harbour)
-        movement_lock.release()
-        time.sleep(10)
+        application.first_create_boats(boat)
+        time.sleep(5)
         # Check if the boat needs gasoline
-        boat.refuel()
+        #boat.refuel()
         # Check the priority of the boat (if it is in front or not).
         boat.priority_check()
         # Check if they can enter the port
@@ -520,18 +545,15 @@ def main(name):  # This is the beginning of the simulation
         # Out of the big queue
         boat.out_entrance_queue()
         locker_database.acquire()
-        sql_class.insert_boats_time(column_name="Time_waited_entrance_area", first_time=first_time, boat=boat, cnx=database,
+        insert_boats_time(column_name="Time_waited_entrance_area", first_time=first_time, boat=boat, cnx=database,
                           cursor=cursor)
         locker_database.release()
         # Goes to the load_off area
         first_time = time.time()
         boat.into_load_off()
-        while movement_lock.locked():
-            continue
-        movement_lock.acquire()
+        application.boat_destroy(boat)
         time.sleep(2)
-        boat.move_boat_cargo(app=application.harbour)
-        movement_lock.release()
+        application.show_boat(boat)
         # Time to get to the loading area
         time.sleep(random.randint(1, 5))
         print(f"{boat.name} entered the loading area.")
@@ -546,13 +568,13 @@ def main(name):  # This is the beginning of the simulation
         boat.out_load_off()
         # Bye.
         locker_database.acquire()
-        sql_class.insert_boats_time(column_name="Time_loading_off_area", first_time=first_time, boat=boat, cnx=database,
+        insert_boats_time(column_name="Time_loading_off_area", first_time=first_time, boat=boat, cnx=database,
                           cursor=cursor)
-        sql_class.insert_boats_departures(start=start, boat=boat, cnx=database, cursor=cursor)
-        sql_class.insert_values_initial(boat=boat, cnx=database, cursor=cursor)
+        insert_boats_departures(start=start, boat=boat, cnx=database, cursor=cursor)
+        insert_values_initial(boat=boat, cnx=database, cursor=cursor)
         locker_database.release()
+        application.boat_destroy(boat)
         finished_boats += 1
-        boat.move_boat(app=application.harbour, x_position=0, y_position=0)
 
         if finished_boats == number_of_boats:
             exit()
@@ -568,8 +590,8 @@ print(f"{Fore.CYAN}WELCOME TO THE PROGRAM SIMULATION!{Style.RESET_ALL}\n"
       f"Here you will create a database of boat arrivals to an specific port. Let's start!")
 print("----------------------------------------------------------------------")
 print(f"{Fore.LIGHTWHITE_EX}First, we need to ask a couple of questions ... {Style.RESET_ALL}")
-database, cursor = sql_class.create_new_database()
-starting_number = sql_class.get_starting_number(cursor=cursor)
+database, cursor = create_new_database()
+starting_number = get_starting_number(cursor=cursor)
 print("----------------------------------------------------------------------")
 print(f"{Fore.LIGHTYELLOW_EX} __WELCOME TO THE SIMULATION__ {Style.RESET_ALL}")
 start = time.time()
@@ -577,7 +599,7 @@ start = time.time()
 
 with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
     executor.map(main, range(starting_number, starting_number + number_of_boats))
-    window.mainloop()
+    root.mainloop()
 
 finish = time.time()
 print("----------------------------------------------------------------------")
