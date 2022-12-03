@@ -29,10 +29,11 @@ class SQLConnection:
             try:
                 self.cursor.execute("CREATE TABLE Boats (Boat VARCHAR(255))")
                 self.cursor.execute(
-                    "CREATE TABLE Boats_arrivals (Boat VARCHAR(255), Arrival_time INT, Departure_time INT)")
+                    "CREATE TABLE Boats_arrivals (Boat VARCHAR(255), Dock VARCHAR(255), Arrival_time INT, Departure_time INT)")
                 self.cursor.execute("CREATE TABLE Machines (Machine VARCHAR(255))")
                 self.cursor.execute("CREATE TABLE Employees (Employee VARCHAR(255))")
                 self.cursor.execute("CREATE TABLE Storage_Area (Number VARCHAR(255))")
+                self.cursor.execute("CREATE TABLE Employees_Race (Employee VARCHAR(255))")
 
             except mysql.connector.errors.ProgrammingError:
                 print("Creating the table...")
@@ -43,12 +44,14 @@ class SQLConnection:
                 self.cursor.execute("DROP TABLE Machines")
                 self.cursor.execute("DROP TABLE Employees")
                 self.cursor.execute("DROP TABLE Storage_Area")
+                self.cursor.execute("DROP TABLE Employees_Race")
                 self.cursor.execute("CREATE TABLE Boats (Boat VARCHAR(255))")
                 self.cursor.execute(
-                    "CREATE TABLE Boats_arrivals (Boat VARCHAR(255), Arrival_time INT, Departure_time INT)")
+                    "CREATE TABLE Boats_arrivals (Boat VARCHAR(255), Dock VARCHAR(255), Arrival_time INT, Departure_time INT)")
                 self.cursor.execute("CREATE TABLE Machines (Machine VARCHAR(255))")
                 self.cursor.execute("CREATE TABLE Employees (Employee VARCHAR(255))")
                 self.cursor.execute("CREATE TABLE Storage_Area (Number VARCHAR(255))")
+                self.cursor.execute("CREATE TABLE Employees_Race (Employee VARCHAR(255))")
                 time.sleep(2)
                 print("Table created successfully!")
 
@@ -58,7 +61,8 @@ class SQLConnection:
             for keys in boat_attributes:
                 format = type(boat_attributes[keys])
                 format = str(format)
-                if keys == "sql" or keys == "mediator" or keys == "active" or keys == "priority" or keys == "name" or keys == "start":
+                if keys == "sql" or keys == "mediator" or keys == "active" or keys == "priority" or keys == "name" \
+                        or keys == "start" or keys == "price":
                     continue
                 if format == "<class 'str'>" or keys == "dock":
                     query = "ALTER TABLE Boats ADD {} VARCHAR (255)".format(keys.capitalize())
@@ -68,9 +72,10 @@ class SQLConnection:
                     query = "ALTER TABLE Boats ADD {} INT ".format(keys.capitalize())
                 self.cursor.execute(query)
 
-            column_list = ["Time_in_queue", "Time_waiting_confirmation", "Time_in_dock", "Time_leaving"]
-            for i in column_list:
-                query = "ALTER TABLE Boats_arrivals ADD {} INT".format(i.capitalize())
+            column_list = ["Time_in_queue", "Time_waiting_confirmation", "Time_in_dock", "Time_leaving",
+                           "Amount_Charged"]
+            for column in column_list:
+                query = "ALTER TABLE Boats_arrivals ADD {} INT".format(column.capitalize())
                 self.cursor.execute(query)
 
             machine = vars(machine)
@@ -89,7 +94,8 @@ class SQLConnection:
             for keys in employee:
                 format = type(employee[keys])
                 format = str(format)
-                if keys == "mediator" or keys == "boat" or keys == "active" or keys == "dock" or keys == "finished" or keys == "name":
+                if keys == "mediator" or keys == "boat" or keys == "active" or keys == "dock" \
+                        or keys == "finished" or keys == "name" or keys == "number_containers":
                     continue
                 if format == "<class 'str'>" or keys == "dock" or format == "<class '__main__.Crane'>":
                     query = "ALTER TABLE Employees ADD {} VARCHAR (255)".format(keys.capitalize())
@@ -118,6 +124,7 @@ class SQLConnection:
             attributes.pop("active")
             attributes.pop("priority")
             attributes.pop("start")
+            attributes.pop("price")
 
             query = "INSERT INTO Boats VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
             values = tuple(attributes.values())
@@ -137,8 +144,9 @@ class SQLConnection:
             attributes.pop("active")
             attributes.pop("boat")
             attributes.pop("dock")
+            attributes.pop("number_containers")
             attributes["machine"] = employee.machine.name
-            query = "INSERT INTO Employees VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            query = "INSERT INTO Employees VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
             values = tuple(attributes.values())
             self.cursor.execute(query, values)
 
@@ -176,6 +184,8 @@ class SQLConnection:
         try:
             query = f"UPDATE Boats_arrivals SET Departure_time= ({time.time() - starting_time}) WHERE Boat =('{boat.name}');"
             self.cursor.execute(query)
+            query = f"UPDATE Boats_arrivals SET Amount_Charged=({boat.price}) WHERE Boat =('{boat.name}');"
+            self.cursor.execute(query)
             self.cnx.commit()
 
         except Exception:
@@ -183,8 +193,16 @@ class SQLConnection:
 
     def insert_boats_time(self, column_name, starting_time, boat):
         try:
-            self.cursor.execute(
-                f"UPDATE Boats_arrivals SET {column_name}=({time.time() - starting_time}) WHERE Boat=('{boat.name}');")
+            if column_name == "Time_in_dock":
+                self.cursor.execute(
+                    f"UPDATE Boats_arrivals SET {column_name}=({time.time() - starting_time}) WHERE Boat=('{boat.name}');")
+                column_name = "Dock"
+                self.cursor.execute(
+                    f"UPDATE Boats_arrivals SET {column_name}=('{boat.dock}') WHERE Boat=('{boat.name}');")
+            else:
+                self.cursor.execute(
+                    f"UPDATE Boats_arrivals SET {column_name}=({time.time() - starting_time}) WHERE Boat=('{boat.name}');")
+
             self.cnx.commit()
 
         except Exception:
@@ -196,7 +214,7 @@ class SQLConnection:
             attributes = vars(copy_machine)
             attributes.pop("locker")
             attributes.pop("active")
-            query = "INSERT INTO Machines VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            query = "INSERT INTO Machines VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
             values = tuple(attributes.values())
             self.cursor.execute(query, values)
 
@@ -209,7 +227,7 @@ class SQLConnection:
         try:
             container = copy.copy(container)
             attributes = vars(container)
-            query = "INSERT INTO Storage_Area VALUES (%s, %s, %s)"
+            query = "INSERT INTO Storage_Area VALUES (%s, %s, %s, %s, %s)"
             values = tuple(attributes.values())
             self.cursor.execute(query, values)
 
@@ -220,13 +238,16 @@ class SQLConnection:
 
 
 class Control:
-    def __init__(self, n_boats, n_docks, sql_connection):
+    def __init__(self, n_boats, n_docks, sql_connection, starting_time):
         # OVERALL SIMULATION VARIABLES
         self.number_of_boats = n_boats
         self.finished_boats = 0
         self.sql = sql_connection
+        self.start = starting_time
+        self.entered_employees_sql = False
 
         # FOR WORKERS
+        self.workers = []
         self.active_workers = []  # This is the list of active workers.
         self.active_workers_locker = threading.Lock()  # Lock for the threads to not collide.
         self.finished = False  # This is the variable that will be used to end the simulation.
@@ -241,8 +262,8 @@ class Control:
         self.entrance_queue_locker = threading.Lock()
         self.boat_request = []
         self.boat_request_locker = threading.Lock()
-        self.storage_area = []
-        self.storage_area_locker = threading.Lock()
+        self.container_storage = dict()
+        self.add_storage()
 
     def add_dock(self, n_docks):
         for x in range(n_docks):
@@ -252,6 +273,14 @@ class Control:
                 "Boat": None,
                 "Crane": None,
                 "Containers": []
+            }
+
+    def add_storage(self):
+        for x in range(1, 4):
+            model = "Storage " + str(x)
+            self.container_storage[model] = {
+                "Containers": [],
+                "Locker": threading.Lock()
             }
 
     def entrance_confirmation(self, boat):
@@ -331,6 +360,9 @@ class Control:
                 break
 
     def insert_sql(self, command, column, object, starting_time):
+        while self.sql.sql_locker.locked():
+            time.sleep(1)
+
         self.sql.sql_locker.acquire()
         if command == "Arrival":
             self.sql.insert_boats_arrivals(starting_time, object)
@@ -352,6 +384,36 @@ class Control:
             print("Error: Command not found.")
         self.sql.sql_locker.release()
 
+    def simulation(self):
+        try:
+            for worker in self.workers:
+                self.sql.sql_locker.acquire()
+                query = f"INSERT INTO Employees_Race (Employee) VALUES('{worker.name}');"
+                self.sql.cursor.execute(query)
+                self.sql.sql_locker.release()
+                self.sql.cnx.commit()
+
+            self.entered_employees_sql = True
+
+            while not self.finished:
+                time_to_record = int(time.time() - self.start)
+                if time_to_record % 20 == 0:
+                    column_name = "Time_" + str(int(time_to_record))
+                    self.sql.sql_locker.acquire()
+                    query = "ALTER TABLE Employees_Race ADD {} VARCHAR (255)".format(column_name.capitalize())
+                    self.sql.cursor.execute(query)
+                    for worker in self.workers:
+                        query = f"UPDATE Employees_Race SET {column_name}=({worker.number_containers}) WHERE Employee =('{worker.name}');"
+                        self.sql.cursor.execute(query)
+                        self.sql.cnx.commit()
+                    self.sql.sql_locker.release()
+
+                time.sleep(1)
+                continue
+
+        except Exception:
+            traceback.print_exc()
+
 
 class Crane:
     def __init__(self, name):
@@ -361,6 +423,7 @@ class Crane:
         self.speed = random.randint(5, 8)
         self.residual_value = random.randint(10000, 50000)
         self.fuel_consumption = int(self.speed * 1.5)
+        self.refueled = "No"
         self.fuel_capacity = 1000
         self.fuel_level = random.randint(0, self.fuel_capacity)
         self.times_used = 0
@@ -372,6 +435,7 @@ class Crane:
         self.fuel_level -= self.fuel_consumption * self.speed
         if self.fuel_level <= 10:
             print(f"WORKER: {Fore.CYAN} Fuel level too low.{Style.RESET_ALL}")
+            self.refueled = "Yes"
             time.sleep(6)
             self.fuel_level = self.fuel_capacity
             print("WORKER: Refueled.")
@@ -383,29 +447,47 @@ class Transporter(Crane):
     def __init__(self, name):
         Crane.__init__(self, name)
 
-    def use_machine(self):
+    def transport(self, mediator, container_list):
         self.times_used += 1
-        time.sleep(random.randint(10,15))
+        found_and_emptied = False
+        while not found_and_emptied:
+            for storage_areas in mediator.container_storage:
+                storage_dictionary = mediator.container_storage[storage_areas]
+                if storage_dictionary["Locker"].locked() or len(storage_dictionary["Containers"]) > 100:
+                    continue
+                else:
+                    storage_dictionary["Locker"].acquire()
+                    time.sleep(random.randint(1, 3))
+                    for container in container_list:
+                        container.place_stored = storage_areas
+                        storage_dictionary["Containers"].append(container)
+                        mediator.insert_sql(command="Containers", object=container, column=None, starting_time=None)
+                    storage_dictionary["Locker"].release()
+                    found_and_emptied = True
+                    break
 
         return True
 
 
 class Container:
-    def __init__(self, number, weight, origin):
+    def __init__(self, number, weight, origin, storage, merchandise):
         self.number = number
+        self.place_stored = storage
         self.weight = weight
         self.origin = origin
+        self.merchandise = merchandise
+        # self.destination = random.choice(["China", "USA", "Germany", "France", "Italy", "Spain", "UK", "Japan", "India"])
 
-    def hello(self):
-        print("Hello")
+    def explode(self):
         self.number = self.number
+        print("Nothing will happen...")
 
 
 class Worker:
     def __init__(self, name, mediator, job):
         self.name = fake.name()
         self.nationality = fake.country()
-        self.age = random.randint(18, 45)
+        self.age = random.randint(22, 45)
         self.address = fake.street_name()
 
         self.mediator = mediator
@@ -420,13 +502,19 @@ class Worker:
         self.dock = None
         self.boat = None
         self.finished = False
-        self.salary = random.randint(1000, 2000)
+        if self.job == "Crane":
+            self.salary = 1500
+        elif self.job == "Transporter":
+            self.salary = 1000
         self.working_time = 0
+        self.actual_working_time = 0
         self.breaks = 0
         self.time_in_break = 0
+        self.number_containers = 0
 
     def simulation(self):
         self.mediator.active_workers_locker.acquire()
+        self.mediator.workers.append(self)
         self.mediator.active_workers.append(self)
         self.mediator.active_workers_locker.release()
         print(f"- {self.name} has started working: \n"
@@ -441,7 +529,7 @@ class Worker:
                 self.mediator.active_workers_locker.acquire()
                 self.mediator.active_workers.remove(self)
                 self.mediator.active_workers_locker.release()
-                print(f"{Fore.LIGHTYELLOW_EX}- {self.name} has stopped working.{Style.RESET_ALL}")
+                #print(f"{Fore.LIGHTYELLOW_EX}- {self.name} has stopped working.{Style.RESET_ALL}")
                 time.sleep(random.randint(5, 10))
                 self.time_in_break += time.time() - break_time
                 time_until_break = time.time()
@@ -456,11 +544,13 @@ class Worker:
                     self.active = False
                     self.finished = True
                     exit()
+
             except Exception as e:
                 traceback.print_exc()
 
     def work(self, job, boat):
-        #print(f"{Fore.LIGHTMAGENTA_EX}- {self.name} is working.{Style.RESET_ALL}")
+        # print(f"{Fore.LIGHTMAGENTA_EX}- {self.name} is working.{Style.RESET_ALL}")
+        start_working = time.time()
         self.machine.active = True
         self.boat = boat
         self.dock = self.boat.dock
@@ -472,28 +562,25 @@ class Worker:
                 time.sleep(2)
             for i in range(boat.containers):
                 number = f"{boat.name.split(' ')[1]:0>3}{i:0>3}"
-                container = Container(str(number), random.randint(100, 500), boat.place_of_origin)
-                #self.mediator.insert_sql(command="Initial", object=container, column=None, starting_time=None)
+                container = Container(str(number), random.randint(100, 500), boat.place_of_origin, "Storage X",
+                                      boat.merchandise)
                 self.mediator.docks[self.dock]["Containers"].append(container)
-
+            self.number_containers += boat.containers
             self.mediator.docks[self.dock]["Crane"] = None
 
         elif job == "Transporter":
             self.mediator.docks[self.dock]["Transporter"] = self.machine
-            finished_transport = self.machine.use_machine()
+            containers = self.mediator.docks[self.dock]["Containers"][:random.randint(50, 800)]
+            finished_transport = self.machine.transport(self.mediator, containers)
+            self.number_containers += len(containers)
             while not finished_transport:
-                time.sleep(10)
-                print(f"Something failed............. {self.name}")
-            self.mediator.storage_area_locker.acquire()
-            self.mediator.docks[self.dock]["Containers"] = self.mediator.docks[self.dock]["Containers"][:random.randint(1, 60)]
-            for container in self.mediator.docks[self.dock]["Containers"]:
-                self.mediator.storage_area.append(container)
-                self.mediator.insert_sql(command="Containers", object=container, column=None, starting_time=None)
-            self.mediator.storage_area_locker.release()
+                time.sleep(2)
+                print(f"WORKER: {self.name} Transporting...")
             self.mediator.docks[self.dock]["Containers"] = []
             self.mediator.docks[self.dock]["Transporter"] = None
 
-        #print(f"{Fore.LIGHTMAGENTA_EX}- {self.name} finished transporting.{Style.RESET_ALL}")
+        # print(f"{Fore.LIGHTMAGENTA_EX}- {self.name} finished transporting.{Style.RESET_ALL}")
+        self.actual_working_time += time.time() - start_working
         self.machine.active = False
         self.boat = None
         self.dock = None
@@ -539,6 +626,7 @@ class Boats:
         self.start = starting_time
 
         # Attributes to fill in the table.
+        self.destination = "Spain"
         self.place_of_origin = random.choice(
             ["United Kingdom", "Colombia", "Argentina", "Mexico", "England", "Germany", "China", "Thailand", "India"])
         self.departure_date = fake.date_time_between(start_date='-1y', end_date='now')
@@ -547,8 +635,8 @@ class Boats:
         self.merchandise = "Item1"
         self.containers = 0
         self.checked_by_police = "No"
-        self.economic_value = 0
-        self.tax = 0
+        self.price = 0
+        self.value_in_market = 0
         self.initialise_attributes()
 
     def initialise_attributes(self):
@@ -563,19 +651,20 @@ class Boats:
                                 [5, 6, 30, 150, 200, 10]
         key_value_of_items = dict(zip(item_list, price_list))
         self.merchandise = random.choice(item_list)
-        self.economic_value = self.containers * key_value_of_items[self.merchandise]
+
+        ########## CREATE A FORMULA FOR THE PRICE CHARGED TO THE BOAT ######
+        self.value_in_market = self.containers * key_value_of_items[self.merchandise]
+
         if random.randint(1, 200) == 1:
             self.merchandise = "Cocaine"
-            self.economic_value = self.containers * 200
-
-        self.tax = self.economic_value * 0.15
+            self.price = self.containers * 200
 
     def delay_in_arriving(self):
         while not self.active:
             time.sleep(5)
             if random.randint(1, 3) == 2:
                 self.active = True
-        #print(f"{Fore.LIGHTBLUE_EX}CONTROL{Style.RESET_ALL}: {self.name} has arrived.")
+        # print(f"{Fore.LIGHTBLUE_EX}CONTROL{Style.RESET_ALL}: {self.name} has arrived.")
 
     def get_into_queue(self):
         self.mediator.entrance_queue_locker.acquire()
@@ -635,7 +724,8 @@ class Boats:
             self.mediator.insert_sql(command="Time", column="Time_in_queue", object=self, starting_time=activity_time)
             activity_time = time.time()
             self.ask_entry_dock()
-            self.mediator.insert_sql(command="Time", column="Time_waiting_confirmation", object=self, starting_time=activity_time)
+            self.mediator.insert_sql(command="Time", column="Time_waiting_confirmation", object=self,
+                                     starting_time=activity_time)
             activity_time = time.time()
             self.unload_request("Crane")
             self.mediator.insert_sql(command="Time", column="Time_in_dock", object=self, starting_time=activity_time)
@@ -650,14 +740,13 @@ class Boats:
             traceback.print_exc()
 
 
-
 ########################################################################################################################
 # input1 = int(input("Hoy many loading areas do you want to simulate? "))
 # number_of_boats = int(input("How many boats do you want to simulate? "))
 ########################################################################################################################
-input1 = 8
-number_of_boats = 5
-number_of_cranes = int(input1/2)
+input1 = 20
+number_of_boats = 20
+number_of_cranes = int(input1 / 2)
 if number_of_cranes == 0:
     number_of_cranes = 1
 
@@ -668,9 +757,10 @@ print(f"Number of docks: {input1}")
 print(f"Number of cranes: {number_of_cranes}")
 
 print("----------------------------------------------------------------------")
+start = time.time()
 sql = SQLConnection()
-control = Control(number_of_boats, input1, sql)
-sql.add_columns(Boats(1, control, sql, 0), Container(0, 0, "E"), Worker(0, control, "Crane"), Crane("Crane"))
+control = Control(number_of_boats, input1, sql, start)
+sql.add_columns(Boats(1, control, sql, 0), Container(0, 0, "E", "S", "C"), Worker(0, control, "Crane"), Crane("Crane"))
 starting_number = sql.get_starting_number()
 print("----------------------------------------------------------------------")
 
@@ -680,24 +770,30 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=number_of_cranes) as exec
         executor.submit(worker_list.simulation)
         time.sleep(1)
 
-
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         worker_list = [Worker(number_of_cranes + i, control, "Transporter") for i in range(1, 4)]
         for index, worker_list in enumerate(worker_list):
             executor.submit(worker_list.simulation)
             time.sleep(1)
 
-        print("----------------------------------------------------------------------")
-        print(f"{Fore.CYAN}WELCOME TO THE PROGRAM SIMULATION!{Style.RESET_ALL}\n"
-              f"Here you will create a database of boat arrivals to an specific port. Let's start!")
-        print("----------------------------------------------------------------------")
-        start = time.time()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            executor.submit(control.simulation)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=int(number_of_boats)) as executor:
-            boat_list = [Boats(i, control, sql, start) for i in range(starting_number, starting_number + number_of_boats)]
-            for index, boat in enumerate(boat_list):
-                executor.submit(boat.simulation)
-        finish = time.time()
-        print(f"----------------------------------------------------------------------\n"
-              f"{Fore.CYAN}SIMULATION FINISHED!{Style.RESET_ALL}\n")
-        print(f"Total time: {int(finish - start)} seconds.")
+            while not control.entered_employees_sql:
+                time.sleep(1)
+                continue
+
+            print("----------------------------------------------------------------------")
+            print(f"{Fore.CYAN}WELCOME TO THE PROGRAM SIMULATION!{Style.RESET_ALL}\n"
+                  f"Here you will create a database of boat arrivals to an specific port. Let's start!")
+            print("----------------------------------------------------------------------")
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=int(number_of_boats/2)) as executor:
+                boat_list = [Boats(i, control, sql, start) for i in
+                             range(starting_number, starting_number + number_of_boats)]
+                for index, boat in enumerate(boat_list):
+                    executor.submit(boat.simulation)
+            finish = time.time()
+            print(f"----------------------------------------------------------------------\n"
+                  f"{Fore.CYAN}SIMULATION FINISHED!{Style.RESET_ALL}\n")
+            print(f"Total time: {int(finish - start)} seconds.")

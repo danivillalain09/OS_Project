@@ -11,12 +11,12 @@ harbour = Canvas(window, width = 1200,  height = 800, bg = "red")
 harbour.pack()
 
 # creating a background image
-harbour_img = PhotoImage(file = "Background_harbour.png")
+harbour_img = PhotoImage(file ="Background_harbour.png")
 harbour_bg = harbour.create_image(0,0, anchor= NW, image= harbour_img )
 
 
 # placing an image on the background
-boat_img = PhotoImage(file = "boat.png")
+boat_img = PhotoImage(file ="boat.png")
 boatimg = boat_img
 boat = harbour.create_image(1100,450, anchor= NW, image= boat_img )
 
