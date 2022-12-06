@@ -19,7 +19,7 @@ class SQLConnection:
                                            password="7deJuniode2002",
                                            host="127.0.0.1",
                                            database="project",
-                                           ssl_disabled= True)
+                                           ssl_disabled=True)
 
         self.cursor = self.cnx.cursor()
         self.create_new_tables()
@@ -430,7 +430,7 @@ class Control:
                     self.sql.cursor.execute(query)
                     self.sql.cnx.commit()
                 except mysql.connector.errors.ProgrammingError:
-                    print("Column already exists.", column)
+                    pass
                 for worker in self.employee_track[column]:
                     query = f"UPDATE Employees_Race SET {column} =({self.employee_track[column][worker]}) WHERE Employee=('{worker.name}');"
                     self.sql.cursor.execute(query)
