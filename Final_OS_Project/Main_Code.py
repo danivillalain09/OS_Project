@@ -129,7 +129,7 @@ class SQLConnection:
             attributes.pop("disable_delay")
             attributes.pop("disable_priority")
 
-            query = "INSERT INTO Boats VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            query = "INSERT INTO Boats VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s, %s)"
             values = tuple(attributes.values())
             self.cursor.execute(query, values)
 
@@ -187,7 +187,7 @@ class SQLConnection:
         try:
             query = f"UPDATE Boats_arrivals SET Departure_time= ({time.time() - starting_time}) WHERE Boat =('{boat.name}');"
             self.cursor.execute(query)
-            query = f"UPDATE Boats_arrivals SET Amount_Charged=({boat.price}) WHERE Boat =('{boat.name}');"
+            query = f"UPDATE Boats_arrivals SET Amount_charged=({int(boat.price)}) WHERE Boat =('{boat.name}');"
             self.cursor.execute(query)
             self.cnx.commit()
 
@@ -287,6 +287,11 @@ class Control:
                 "Locker": threading.Lock()
             }
 
+    def refuel(self, boat):
+        time.sleep(2)
+        boat.fuel = 500
+        return True
+
     def entrance_confirmation(self, boat):
         if boat.priority != 0:
             time.sleep(3)
@@ -341,6 +346,17 @@ class Control:
 
         return found
 
+    def calculate_price(self, boat, start):
+        time_in_port = time.time() - start
+        if boat.model == "Model 1":
+            boat.price = int((time_in_port*0.15) * ((boat.value_in_market*0.15)+(boat.containers*0.15)))
+        elif boat.model == "Model 2":
+            boat.price = int((time_in_port*0.17) * ((boat.value_in_market*0.17)+(boat.containers*0.17)))
+        elif boat.model == "Model 3":
+            boat.price = int((time_in_port*0.20) * ((boat.value_in_market*0.20)+(boat.containers*0.20)))
+        else:
+            boat.price = 100000
+
     def dock_response_leave(self, boat, boat_dock):
         self.call_transporter(boat)
         if self.docks[boat_dock]["Boat"] is boat:
@@ -392,7 +408,6 @@ class Control:
         try:
             for worker in self.workers:
                 self.sql.sql_locker.acquire()
-                print("Going to insert in sql a worker. Employees Race")
                 query = f"INSERT INTO Employees_Race (Employee, Machine, Picture) VALUES('{worker.name}','{worker.machine.name}','{worker.picture}');"
                 self.sql.cursor.execute(query)
                 self.sql.cnx.commit()
@@ -464,7 +479,9 @@ class Transporter(Crane):
         while not found_and_emptied:
             for storage_areas in mediator.container_storage:
                 storage_dictionary = mediator.container_storage[storage_areas]
-                if storage_dictionary["Locker"].locked():
+                if storage_dictionary["Locker"].locked() or len(storage_dictionary["Containers"]) > 6000:
+                    if len(storage_dictionary["Containers"]) > 6000:
+                        print(f"{Fore.YELLOW} WORKER:{Style.RESET_ALL} Storage area {storage_areas} is full.")
                     continue
                 else:
                     storage_dictionary["Locker"].acquire()
@@ -523,9 +540,9 @@ class Worker:
         self.boat = None
         self.finished = False
         if self.job == "Crane":
-            self.salary = 1500
+            self.salary = 200
         elif self.job == "Transporter":
-            self.salary = 1000
+            self.salary = 250
         self.workday_time = 0
         self.working_time = 0
         self.breaks = 0
@@ -652,6 +669,8 @@ class Boats:
         self.departure_date = fake.date_time_between(start_date='-1y', end_date='now')
         self.arrival_date = date.today()
         self.model = random.choice(["Model 1", "Model 2", "Model 3"])
+        self.fuel = random.randint(100, 500)
+        self.refueled = "No"
         self.merchandise = "Item1"
         self.containers = 0
         self.checked_by_police = "No"
@@ -677,7 +696,6 @@ class Boats:
 
         if random.randint(1, 200) == 1:
             self.merchandise = "Cocaine"
-            self.price = 0
 
     def delay_in_arriving(self):
         if not self.disable_delay:
@@ -695,11 +713,12 @@ class Boats:
 
     def ask_entry_port(self):
         if not self.disable_priority:
+
             while not self.mediator.entrance_confirmation(self):
                 time.sleep(1)
                 continue
 
-        print(f"{Fore.LIGHTBLUE_EX}CONTROL{Style.RESET_ALL}: {self.name} has entered the port.")
+            print(f"{Fore.LIGHTBLUE_EX}CONTROL{Style.RESET_ALL}: {self.name} has entered the port.")
 
     def out_of_queue(self):
         time.sleep(3)
@@ -721,6 +740,17 @@ class Boats:
         else:
             print(f"{Fore.LIGHTBLUE_EX}CONTROL{Style.RESET_ALL}: {self.name} has docked in {self.dock}.")
             pass
+
+    def refuel_ask(self):
+        if self.fuel <= 200:
+            refueled = self.mediator.refuel(self)
+            self.refueled = "Yes"
+
+            while not refueled:
+                time.sleep(1)
+                continue
+
+            print(f"{Fore.LIGHTBLUE_EX}CONTROL{Style.RESET_ALL}: {self.name} has refueled.")
 
     def unload_request(self, job):
         while not self.mediator.crane_request(job, selected_boat=self):
@@ -744,6 +774,7 @@ class Boats:
             self.get_into_queue()
             self.ask_entry_port()
             self.out_of_queue()
+            self.refuel_ask()
             self.mediator.insert_sql(command="Time", column="Time_in_queue", object=self, starting_time=activity_time)
             activity_time = time.time()
             self.ask_entry_dock()
@@ -756,6 +787,7 @@ class Boats:
             self.ask_leave_dock()
             self.ask_leave_port()
             self.mediator.insert_sql(command="Time", column="Time_leaving", object=self, starting_time=activity_time)
+            self.mediator.calculate_price(self, self.start)
             self.mediator.insert_sql(command="Departure", column=None, object=self, starting_time=self.start)
             self.mediator.insert_sql(command="Initial", column=None, object=self, starting_time=None)
 
@@ -858,7 +890,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=number_of_cranes) as exec
                   f"Here you will create a database of boat arrivals to an specific port. Let's start!")
             print("----------------------------------------------------------------------")
 
-            if number_of_boats > 20:
+            if number_of_boats >= 40:
                 number_of_threads = number_of_boats / 2
             elif number_of_boats > 60:
                 number_of_threads = number_of_boats / 3
